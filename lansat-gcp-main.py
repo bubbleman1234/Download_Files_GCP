@@ -1,12 +1,15 @@
 import json
 import os, csv
+import shutil
 import logging
+import datetime
 import concurrent.futures
 from google.cloud import storage
 
 directory = []
 current_path = os.path.abspath(os.getcwd())
 formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+datenow = (datetime.datetime.now()).strftime("%Y-%m-%d")
 
 def BeautySize(nbytes):
     i = 0
@@ -77,7 +80,7 @@ def CheckDirectory(path):
 		pass
 
 def CreateDirectory(year):
-    pathlog = current_path + '/logs/directory.log'
+    pathlog = current_path + '/logs/directory-'+ datenow +'.log'
     logger = setup_logger('CreateDirectory', pathlog)
     for path in directory:
         #EX. path = LC08/01/132/046/LC08_L1TP_132046_20191222_20200110_01_T1/
@@ -86,13 +89,13 @@ def CreateDirectory(year):
             if not os.path.exists(path):
                 try: 
                     os.makedirs(path, exist_ok = True)
-                    logger.info("Directory '%s' created successfully" % path)
-                except: 
-                    logger.error("Directory '%s' can not be created" % path)
+                    logger.info("Directory %s created successfully", path)
+                except Exception as e: 
+                    logger.error("Directory %s can not be created\nReason: %s" , path, e)
             else:
-                logger.warning("Directory '%s' already exist!!" % path)
+                logger.warning("Directory %s already exist!!", path)
 
-def CheckListFile(filecheck, time):
+def CheckListFile(filecheck, time, logger):
     #EX: filecheck[0] = LC08/01/131/046/LC08_L1TP_131046_20200912_20200919_01_T1/LC08_L1TP_131046_20200912_20200919_01_T1_B6.TIF
     #EX: filename = LC08_L1TP_131046_20200912_20200919_01_T1_B6.TIF
     #EX: datecreatefile = 20200912
@@ -101,15 +104,24 @@ def CheckListFile(filecheck, time):
     for check in filecheck:
         filename = check[0].split('/')[5]
         datecreatefile = filename.split('_')[3]
-        if time in datecreatefile:
+        checkexist = current_path + "/" + check[0]
+        #Check file download is already exist in directory or not.
+        if os.path.exists(checkexist):
+            logger.info("File: %s already exist.",filename)
+
+        elif time in datecreatefile:
             result["file"].append(check[0])
             size += check[1]
+
     result["size"] = BeautySize(size)
+    result["rawsize"] = size
     return result
 
 def GetFile(wrs2thai):
-    year = "201912"
+    year = "2019"
     CreateDirectory(year)
+    pathlog = current_path + '/logs/download-'+ datenow +'.log'
+    logger = setup_logger('DownloadFiles', pathlog)
     for i in wrs2thai:
         #EX. filename = /root/NECTEC/Download_Files_GCP/key/132046.json
         filename = current_path + "/key/" + i[0] + i[1] + ".json"
@@ -117,27 +129,42 @@ def GetFile(wrs2thai):
         try:
             with open( filename, "r") as read_file:
                 data = json.load(read_file)
-            listfile = CheckListFile(data[key], year)
-            print("Tile:",key,"Estimate Size:",listfile['size'])
-        #print(listfile)
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                for eachfile in listfile['file']:
-                    executor.submit(Download, filedownload = eachfile, year = year)
-        except Exception as e:
-            print(e)
-            print("Cannot open file:",filename)
+            listfile = CheckListFile(data[key], year, logger)
+            #Check files size
+            if listfile['size'] == "0 B":
+                print("Tile:",key,"No Files need to download.")
+            else:
+                print("Tile:",key,"Estimate Size Download:",listfile['size'])
+                logger.info("Prepare to Download Tile: %s Estimate Size Download: %s", key, listfile['size'])
 
-def Download(filedownload, year):
+            disk = shutil.disk_usage("/")
+            #(total, used, free) = shutil.disk_usage("/")
+            if disk.free > listfile['rawsize']:
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    for eachfile in listfile['file']:
+                        executor.submit(Download, filedownload = eachfile, totalfilesize = listfile['rawsize'], year = year, logger = logger)
+            else:
+                freedisk = BeautySize(disk.free)
+                totalfile = BeautySize(listfile['rawsize'])
+                print("Not enough spaces. Disk Free: %s File size: %s" %(freedisk,totalfile))
+                logger.error("Not enough spaces. Disk Free: %s File size: %s",freedisk, totalfile)
+        except Exception as e:
+            print("Cannot open file: %s\nReason: %s", filename, e)
+            logger.error("Cannot open file: %s\nReason: %s", filename, e)
+
+def Download(filedownload, totalfilesize, year, logger):
     print("Starting Download:",filedownload)
+    logger.info("Starting Download File: %s",filedownload)
     try:
         storage_client = storage.Client()
         bucket = storage_client.bucket("gcp-public-data-landsat")
         blob = bucket.blob(filedownload)
         blob.download_to_filename(blob.name)
-        print("Download Successful")
+        print("Download",filedownload,"Successful")
+        logger.info("Download File: %s Completed",filedownload)
     except Exception as e:
-        print(e)
-        print("Download Failed")
+        print("Download File: %s Failed\nReason: %s", filedownload, e)
+        logger.info("Download File: %s Failed\nReason: %s", filedownload, e)
 
 if __name__ == "__main__":
     wrs2thai = ReadCSV()
