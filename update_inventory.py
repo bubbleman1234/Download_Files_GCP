@@ -1,4 +1,5 @@
 import os
+import json
 import datetime
 from dateutil.relativedelta import relativedelta
 import concurrent.futures
@@ -28,7 +29,7 @@ def ListFiles(tile, filelatest, file5year):
                 filesize = os.path.getsize(pathfile)
                 if filesize == size:
                     localcount += 1
-                    print("File: %s already download.\nSize: %s" %(name, common.BeautySize(size)))
+                    #print("File: %s already download.\nSize: %s" %(name, common.BeautySize(size)))
                 elif filesize != size:
                     print("File: %s already download but size different.\nSize local: %s, Size cloud: %s" %(name, common.BeautySize(size), common.BeautySize(filesize)))
             
@@ -46,7 +47,7 @@ def ListFiles(tile, filelatest, file5year):
                 if yearnow - yearcreate < 5:
                     miscount += 1
                     #For case update every week
-                    if yearcreate == yearnow and monthcreate == monthnow:
+                    if yearcreate == yearnow and monthnow - monthcreate <= 1 :
                         filelatest.append({'name': name, 'size': size})
                     else:
                         file5year.append({'name': name, 'size': size})
@@ -80,44 +81,54 @@ def CheckFiles():
     tilelist = common.ReadCSV(current_path)
     filelatest = []
     file5year = []
+    list5year = []
+
     for eachtile in tilelist:
         ListFiles(eachtile, filelatest, file5year)
-
-    # for i in filelatest:
-    #     print("File: %s Size: %s" %(i["name"], common.BeautySize(i["size"])))
     
-    ListFiletoJSON(file5year)
-    # print("#######################")
-    # for i in file5year:
-    #     print("File: %s Size: %d" %(i["name"], i["size"]))
-    # today = datetime.datetime.today()
-    # lastyear = today - relativedelta(years=3)
-    # print("Today: %s LastYear: %s" %(today, lastyear))
+    #Create File JSON for download data later
+    jsondata = ListFiletoJSON(file5year, list5year)
+    CreateListData5Y(jsondata, list5year)
 
-def ListFiletoJSON(file5year):
+    return filelatest
+
+def ListFiletoJSON(file5year, listyear):
     forjson = {}
 
     for eachfile in file5year:
         date = ((eachfile["name"].split("/"))[5].split("_"))[3]
         yearoffile = date[0:4]
         monthoffile = date[4:6]
-        tmp = [yearoffile, monthoffile]
-        tmp2 = {"name": eachfile["name"], "size": eachfile["size"]}
+        filedetail = {"name": eachfile["name"], "size": eachfile["size"]}
+
+        #for Create JSON file by reference from year
+        if yearoffile not in listyear:
+            listyear.append(yearoffile)
 
         #Case forjson have key year & month EX. {"2015": [{"10": [XXXX]}]}
         if yearoffile in forjson.keys() and monthoffile in forjson[yearoffile][0].keys():
-            forjson[yearoffile][0][monthoffile].append(tmp2)
+            forjson[yearoffile][0][monthoffile].append(filedetail)
 
         #Case forjson have key year only (New Month) Ex. {"2015": []}
         elif yearoffile in forjson.keys():
-            forjson[yearoffile][0][monthoffile] = [tmp2]
+            forjson[yearoffile][0][monthoffile] = [filedetail]
 
         #Case forjson don't have any key (New year)
         elif yearoffile not in forjson.keys():
-            forjson[yearoffile] = [{monthoffile:[tmp2]}]
+            forjson[yearoffile] = [{monthoffile:[filedetail]}]
     
-    print(listyear)
-    print(forjson["2015"])
+    return forjson
+
+def CreateListData5Y(jsondata, listyear):
+    for year in listyear:
+        result = jsondata[year][0]
+        with open(current_path + '/data/'+ year + '.json', 'w+') as fp:
+            json.dump(result, fp)
+
+def DownloadUpdate(filedownload):
+    for i in filedownload:
+        print(i["name"])
 
 if __name__ == "__main__":
-    CheckFiles()
+    filedownload = CheckFiles()
+    DownloadUpdate(filedownload)
