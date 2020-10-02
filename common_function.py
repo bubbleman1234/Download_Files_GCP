@@ -1,4 +1,5 @@
 import logging
+import shutil
 import os, csv
 from google.cloud import storage
 
@@ -13,7 +14,7 @@ def BeautySize(nbytes):
     
     return '%s %s' % (f, suffixes[i])
 
-def setup_logger(formatter, name, log_file, level=logging.INFO):
+def SetupLogger(formatter, name, log_file, level=logging.INFO):
     handler = logging.FileHandler(log_file)        
     handler.setFormatter(formatter)
 
@@ -39,7 +40,20 @@ def GCPQuery(pathrow):
     blobs = client.list_blobs("gcp-public-data-landsat", prefix=prefix, delimiter=None)
     return blobs
 
-def Download(filedownload, totalfilesize, year, logger):
+def CheckDiskUsage(filesize):
+    disk = shutil.disk_usage("/")
+    if disk.free > filesize:
+        return True
+    else:
+        return False
+
+def CheckDirectory(path, directory):
+	if path not in directory:
+		return True
+	else:
+		return False
+
+def Download(filedownload, logger):
     print("Starting Download:",filedownload)
     logger.info("Starting Download File: %s",filedownload)
     try:
@@ -50,5 +64,5 @@ def Download(filedownload, totalfilesize, year, logger):
         print("Download",filedownload,"Successful")
         logger.info("Download File: %s Completed",filedownload)
     except Exception as e:
-        print("Download File: %s Failed\nReason: %s", filedownload, e)
-        logger.info("Download File: %s Failed\nReason: %s", filedownload, e)
+        print("Download File: %s Failed\nReason: %s" %(filedownload, e))
+        logger.error("Download File: %s Failed\nReason: %s", filedownload, e)
