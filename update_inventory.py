@@ -12,10 +12,6 @@ datenow = (datetime.datetime.now()).strftime("%Y-%m-%d")
 
 def ListFiles(tile, filelatest, file5year):
     today = (datetime.datetime.now()).strftime("%Y%m")
-    #today = "202009"
-    #pathlog = current_path + '/logs/checkcase-'+ today +'.log'
-    #logger = common.setup_logger(formatter, 'Checkcase', pathlog)
-    #today = (datetime.datetime.now()).strftime("%Y%m")
     indexfile = common.GCPQuery(tile)
     localcount = 0
     miscount = 0
@@ -45,9 +41,7 @@ def ListFiles(tile, filelatest, file5year):
                 yearcreate = int(filecreate[0:4])
                 monthnow = int(today[4:])
                 monthcreate = int(filecreate[4:])
-                #print("YearNow: %d MonthNow: %d | YearCreate: %d MonthCreate: %d" %(yearnow, monthnow, yearcreate, monthcreate))
-                #logger.info("YearNow: %d MonthNow: %d | YearCreate: %d MonthCreate: %d" ,yearnow, monthnow, yearcreate, monthcreate)
-                
+ 
                 #For case lower 5 years
                 if yearnow - yearcreate < 5:
                     miscount += 1
@@ -59,9 +53,6 @@ def ListFiles(tile, filelatest, file5year):
                         filelatest.append({'name': name, 'size': size})
                     else:
                         file5year.append({'name': name, 'size': size})
-                    #result.append({'name': name, 'size': size})
-                    #print("Case Lower 5 Years")
-                    #logger.info("Case Lower 5 Years")
 
                 #For case 5 years but month query less than month now
                 elif yearnow - yearcreate == 5 and monthcreate >= monthnow:
@@ -70,13 +61,8 @@ def ListFiles(tile, filelatest, file5year):
                     if common.CheckDirectory(directory, directory_path):
                         directory_path.append(directory)
                     file5year.append({'name': name, 'size': size})
-                    #result.append({'name': name, 'size': size})
-                    #print("Case 5 Years")
-                    #logger.info("Case 5 Years")
-                #print(filecreate)
+
                 else:
-                    #print("Case Not download")
-                    #logger.info("Case Not download")
                     notload.append(name.split('/')[4])
                         
     newlist = []

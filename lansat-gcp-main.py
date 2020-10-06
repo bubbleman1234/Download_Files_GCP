@@ -41,8 +41,9 @@ def ReadCSV():
     return wrs2thai
 
 def GetKey(wrs2thai):
-    credential_path = current_path + "/credential.json"
-    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credential_path
+    #If Get the error due to authentication not success uncomment this 2 lines
+    #credential_path = current_path + "/credential.json"
+    #os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credential_path
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
         for row in wrs2thai:
@@ -118,7 +119,7 @@ def CheckListFile(filecheck, time, logger):
     return result
 
 def GetFile(wrs2thai):
-    year = "2019"
+    year = "20200928"
     CreateDirectory(year)
     pathlog = current_path + '/logs/download-'+ datenow +'.log'
     logger = setup_logger('DownloadFiles', pathlog)
@@ -138,7 +139,6 @@ def GetFile(wrs2thai):
                 logger.info("Prepare to Download Tile: %s Estimate Size Download: %s", key, listfile['size'])
 
             disk = shutil.disk_usage("/")
-            #(total, used, free) = shutil.disk_usage("/")
             if disk.free > listfile['rawsize']:
                 with concurrent.futures.ThreadPoolExecutor() as executor:
                     for eachfile in listfile['file']:
